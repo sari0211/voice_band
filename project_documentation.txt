@@ -1,0 +1,375 @@
+================================================================================
+                    VOICE BAND - PROJECT DOCUMENTATION
+================================================================================
+
+
+================================================================================
+PART 1: CLASS-BASED (What each class is responsible for & features it supports)
+================================================================================
+
+
+--- MODELS ---
+
+1. Question (lib/models/question.dart)
+   Responsibility: Represents a single IELTS speaking test question
+   Fields: id, text, category
+   Features used on: Question Answering
+
+2. FeedbackItem (lib/models/recording.dart)
+   Responsibility: Stores feedback for a specific aspect of speech
+   Fields: type, message, suggestion
+   Methods: toJson(), fromJson()
+   Features used on: Feedback Generation, Score Display
+
+3. WordDetail (lib/models/recording.dart)
+   Responsibility: Stores word-level pronunciation analysis data
+   Fields: word, accuracyScore, errorType, durationMs, offsetMs
+   Methods: toJson(), fromJson()
+   Features used on: Speech Assessment, Word Highlighting
+
+4. AssessmentResult (lib/models/recording.dart)
+   Responsibility: Complete assessment result from Azure Speech Service
+   Fields: transcript, pronunciationScore, fluencyScore, completenessScore,
+           prosodyScore, overallScore, words, speechRate, pauseCount,
+           averagePauseDurationMs, vocabularyScore, coherenceScore, feedback
+   Methods: toJson(), fromJson()
+   Features used on: Speech Assessment, Score Display, Feedback Generation
+
+5. Recording (lib/models/recording.dart)
+   Responsibility: Represents a user's recorded speech submission
+   Fields: id, createdAt, durationSeconds, audioFilePath, isProcessed,
+           errorMessage, result
+   Methods: toJson(), fromJson(), toJsonString(), fromJsonString()
+   Features used on: Recording History, Audio Playback
+
+
+--- SERVICES ---
+
+6. AudioRecorderService (lib/services/audio_recorder_service.dart)
+   Responsibility: Handles microphone recording (WAV mono 16kHz)
+   Methods:
+     - hasPermission()    -> checks microphone permission
+     - startRecording()   -> starts WAV recording, returns file path
+     - stopRecording()    -> stops current recording
+     - isRecording()      -> checks if currently recording
+     - dispose()          -> cleans up recorder instance
+   Features used on: Question Answering, Real-time Recording UI
+
+7. AzureSpeechService (lib/services/azure_speech_service.dart)
+   Responsibility: Speech-to-text and pronunciation assessment via Azure
+   Methods:
+     - assessPronunciation(audioFilePath) -> transcribes and assesses audio
+     - _transcribe(audioBytes)            -> Azure STT conversion
+     - _assess(audioBytes, transcript)    -> pronunciation assessment
+     - _estimateDurationFromWords(words)  -> calculates speech duration
+   Features used on: Speech Assessment, Question Answering
+
+8. AzureTtsService (lib/services/azure_tts_service.dart)
+   Responsibility: Converts text to speech via Azure TTS (Jenny Neural voice)
+   Methods:
+     - synthesize(text)   -> converts text to MP3 audio bytes
+     - _escapeXml(text)   -> sanitizes text for SSML
+   Features used on: Question Answering (question playback)
+
+9. StorageService (lib/services/storage_service.dart)
+   Responsibility: Persistent storage of recordings as JSON on disk
+   Methods:
+     - init()                    -> loads recordings from disk on startup
+     - _load()                   -> reads recordings.json
+     - _save()                   -> persists recordings to JSON
+     - getAllRecordings()         -> returns all recordings sorted by date
+     - getRecording(id)          -> retrieves single recording by ID
+     - addRecording(recording)   -> creates new recording entry
+     - updateRecording(recording)-> updates existing recording
+     - deleteRecording(id)       -> deletes recording and audio file
+   Features used on: Recording History
+
+10. FeedbackService (lib/services/feedback_service.dart)
+    Responsibility: Generates contextual feedback and computes extra metrics
+    Methods:
+      - computeSpeechRate(wordCount, durationSeconds) -> words per minute
+      - computePauses(words)                          -> pauses >500ms detection
+      - computeVocabularyScore(transcript)            -> type-to-token ratio
+      - computeCoherenceScore(transcript)             -> discourse marker analysis
+      - generateFeedback(result)                      -> 6-8 feedback items
+    Features used on: Feedback Generation, Speech Assessment
+
+
+--- PROVIDERS (State Management) ---
+
+11. RecordingsProvider (lib/providers/recordings_provider.dart)
+    Responsibility: Global state for all user recordings
+    Methods:
+      - loadRecordings()      -> loads all recordings from storage
+      - createRecording()     -> creates new recording, queues assessment
+      - _assessRecording()    -> background assessment task
+      - retryAssessment()     -> retries failed assessment
+      - deleteRecording()     -> removes recording and audio file
+    Features used on: Recording History, Question Answering
+
+12. RecordingSessionProvider (lib/providers/recording_session_provider.dart)
+    Responsibility: Manages single recording session state (timer, progress)
+    Methods:
+      - startRecording()  -> initializes recording session
+      - stopRecording()   -> ends recording, returns file path
+      - dispose()         -> cleans up timer
+    Getters: isRecording, elapsedSeconds, timerText, progress
+    Features used on: Real-time Recording UI
+
+13. QuestionSessionProvider (lib/providers/question_session_provider.dart)
+    Responsibility: Manages the complete question-to-assessment workflow
+    States: idle -> playingQuestion -> waitingForRecord -> recording ->
+            processing -> completed / error
+    Methods:
+      - startTts()        -> synthesizes and plays question audio
+      - startRecording()  -> begins recording answer
+      - stopRecording()   -> ends recording and triggers assessment
+      - retry()           -> resets state to try question again
+      - dispose()         -> cleans up timer and player
+    Features used on: Question Answering (core flow controller)
+
+
+--- UTILITIES ---
+
+14. AppConstants (lib/utils/constants.dart)
+    Responsibility: Centralized configuration values
+    Constants: azureSubscriptionKey, azureRegion, ttsVoiceName,
+              maxRecordingDurationSeconds (120), sampleRate (16000),
+              bandThresholds, score weights
+    Features used on: All features (configuration)
+
+15. IeltsBandMapper (lib/utils/ielts_band_mapper.dart)
+    Responsibility: Converts numeric scores to IELTS band levels
+    Methods:
+      - mapScoreToBand(overallScore)   -> 0-100 score to 1.0-9.0 band
+      - calculateOverallScore()        -> weighted average of 4 components
+      - bandLabel(band)                -> "Expert", "Very Good", "Competent", etc.
+    Features used on: Score Calculation, Score Display
+
+
+--- SCREENS ---
+
+16. HomeScreen (lib/screens/home_screen.dart)
+    Responsibility: Main menu showing all questions grouped by Part 1/2/3
+    Features used on: Question Answering (entry point)
+
+17. QuestionScreen (lib/screens/question_screen.dart)
+    Responsibility: Complete question answering workflow UI
+    Features used on: Question Answering, Score Display, Feedback Display
+
+18. ResultDetailScreen (lib/screens/result_detail_screen.dart)
+    Responsibility: View previously saved assessment results
+    Features used on: Recording History, Audio Playback, Score Display
+
+
+--- WIDGETS ---
+
+19. ScoreCard (lib/widgets/score_card.dart)
+    Responsibility: Visual score display with color coding
+    Features used on: Score Display
+
+20. WordHighlight (lib/widgets/word_highlight.dart)
+    Responsibility: Renders transcript with per-word accuracy colors
+    Features used on: Score Display (word-level visualization)
+
+21. RecordingOverlay (lib/widgets/recording_overlay.dart)
+    Responsibility: Recording session overlay with animated mic and timer
+    Subwidget: _PulsingMic (animated microphone icon)
+    Features used on: Real-time Recording UI
+
+22. RecordingTile (lib/widgets/recording_tile.dart)
+    Responsibility: List item displaying a recording with playback/delete
+    Features used on: Recording History, Audio Playback
+
+
+--- DATA ---
+
+23. QuestionsData (lib/data/questions_data.dart)
+    Responsibility: Static question bank (20 questions across 3 parts)
+    Features used on: Question Answering
+
+
+================================================================================
+PART 2: FEATURE-BASED (What feature uses what class and its methods)
+================================================================================
+
+
+FEATURE 1: QUESTION ANSWERING (Core Flow)
+------------------------------------------
+The main user flow: browse questions, listen to TTS, record answer, get results.
+
+Classes & Methods Used:
+  - QuestionsData                          -> provides question list
+  - Question                               -> question data model
+  - HomeScreen                             -> displays question list, navigates to QuestionScreen
+  - QuestionScreen                         -> manages workflow UI
+  - QuestionSessionProvider
+      .startTts()                          -> plays question via TTS
+      .startRecording()                    -> starts recording user answer
+      .stopRecording()                     -> stops recording, triggers assessment
+      .retry()                             -> resets for another attempt
+  - AzureTtsService
+      .synthesize(text)                    -> converts question text to speech audio
+  - AudioRecorderService
+      .hasPermission()                     -> checks mic permission
+      .startRecording()                    -> starts WAV recording
+      .stopRecording()                     -> stops recording, returns file path
+  - AzureSpeechService
+      .assessPronunciation(audioFilePath)  -> transcribes and assesses the recording
+  - RecordingsProvider
+      .createRecording()                   -> saves recording to history
+  - AppConstants                           -> Azure credentials, recording config
+
+
+FEATURE 2: SPEECH ASSESSMENT & ANALYSIS
+-----------------------------------------
+Transcribes audio, assesses pronunciation, computes additional metrics.
+
+Classes & Methods Used:
+  - AzureSpeechService
+      ._transcribe(audioBytes)             -> Azure speech-to-text
+      ._assess(audioBytes, transcript)     -> pronunciation assessment (word-level)
+      ._estimateDurationFromWords(words)   -> calculates total speech duration
+  - FeedbackService
+      .computeSpeechRate(wordCount, dur)   -> calculates words per minute
+      .computePauses(words)                -> detects pauses >500ms between words
+      .computeVocabularyScore(transcript)  -> type-to-token ratio scoring
+      .computeCoherenceScore(transcript)   -> discourse markers & sentence analysis
+  - AssessmentResult                       -> stores all computed scores
+  - WordDetail                             -> stores per-word accuracy and error type
+  - AppConstants                           -> score weights for overall calculation
+
+
+FEATURE 3: SCORE CALCULATION & DISPLAY
+----------------------------------------
+Converts raw scores to IELTS bands and displays them visually.
+
+Classes & Methods Used:
+  - IeltsBandMapper
+      .calculateOverallScore()             -> weighted average (pron 0.3, fluency 0.3,
+                                              prosody 0.2, completeness 0.2)
+      .mapScoreToBand(overallScore)        -> maps 0-100 to IELTS 1.0-9.0
+      .bandLabel(band)                     -> returns label ("Expert", "Competent", etc.)
+  - AppConstants
+      .bandThresholds                      -> score-to-band mapping table
+  - ScoreCard widget                       -> displays individual metric score with
+                                              color coding (green 80+, orange 60-79, red <60)
+  - WordHighlight widget                   -> colors each word by accuracy score
+  - QuestionScreen                         -> shows 8 score cards + band on completion
+  - ResultDetailScreen                     -> shows scores for saved recordings
+
+
+FEATURE 4: FEEDBACK GENERATION
+-------------------------------
+Produces actionable improvement suggestions based on assessment scores.
+
+Classes & Methods Used:
+  - FeedbackService
+      .generateFeedback(result)            -> analyzes all scores, produces 6-8 items:
+                                              - pronunciation feedback (lists mispronounced words)
+                                              - fluency feedback
+                                              - speech rate feedback (too fast/slow)
+                                              - pause feedback (too many/long pauses)
+                                              - vocabulary feedback
+                                              - coherence feedback
+  - FeedbackItem                           -> model with type, message, suggestion
+  - AssessmentResult.feedback              -> stores generated feedback items
+  - QuestionScreen                         -> displays feedback after assessment
+  - ResultDetailScreen                     -> displays feedback for saved recordings
+
+
+FEATURE 5: RECORDING HISTORY & PERSISTENCE
+--------------------------------------------
+Saves, loads, and manages all past recordings.
+
+Classes & Methods Used:
+  - StorageService
+      .init()                              -> loads recordings on app startup
+      .addRecording(recording)             -> persists new recording to JSON
+      .updateRecording(recording)          -> updates recording after assessment
+      .getAllRecordings()                   -> returns all recordings sorted by date
+      .getRecording(id)                    -> retrieves single recording
+      .deleteRecording(id)                 -> deletes recording + audio file
+  - RecordingsProvider
+      .loadRecordings()                    -> populates state from storage
+      .createRecording()                   -> creates and stores new recording
+      ._assessRecording()                  -> runs background assessment
+      .retryAssessment()                   -> retries failed assessment
+      .deleteRecording()                   -> removes recording from state + storage
+  - Recording model                        -> serializable recording data
+  - RecordingTile widget                   -> list item with band score, date, duration
+  - ResultDetailScreen                     -> full detail view of a saved recording
+
+
+FEATURE 6: AUDIO PLAYBACK
+---------------------------
+Plays back recorded answers and TTS question audio.
+
+Classes & Methods Used:
+  - QuestionSessionProvider
+      .startTts()                          -> plays synthesized question audio via AudioPlayer
+      ._player (AudioPlayer)               -> audioplayers instance for TTS playback
+  - RecordingTile
+      ._togglePlayback()                   -> plays/pauses recorded audio
+  - ResultDetailScreen
+      ._togglePlayback()                   -> plays/pauses recorded audio
+  - AudioPlayer (audioplayers package)     -> cross-platform audio playback
+
+
+FEATURE 7: REAL-TIME RECORDING UI
+-----------------------------------
+Shows recording progress with animated mic, timer, and auto-stop.
+
+Classes & Methods Used:
+  - RecordingOverlay widget                -> overlay UI during recording
+      - _PulsingMic subwidget              -> animated scaling microphone icon
+      - Timer display (mm:ss / mm:ss)
+      - Linear progress bar
+      - Stop button
+  - RecordingSessionProvider
+      .startRecording()                    -> initializes recording + timer
+      .stopRecording()                     -> stops recording + timer
+      .elapsedSeconds                      -> current recording time
+      .maxSeconds                          -> max allowed (120s)
+      .timerText                           -> formatted elapsed time
+      .progress                            -> 0.0-1.0 progress value
+  - AudioRecorderService
+      .startRecording()                    -> starts actual microphone capture
+      .stopRecording()                     -> stops capture
+  - AppConstants
+      .maxRecordingDurationSeconds         -> 120 second limit
+
+
+================================================================================
+DATA FLOW SUMMARY
+================================================================================
+
+  HomeScreen (browse questions)
+       |
+       v
+  QuestionScreen
+       |
+       +--> QuestionSessionProvider.startTts()
+       |        --> AzureTtsService.synthesize() --> AudioPlayer plays question
+       |
+       +--> QuestionSessionProvider.startRecording()
+       |        --> AudioRecorderService.startRecording()
+       |        --> RecordingOverlay shows timer + animated mic
+       |
+       +--> QuestionSessionProvider.stopRecording()
+       |        --> AudioRecorderService.stopRecording()
+       |        --> AzureSpeechService.assessPronunciation()
+       |              --> _transcribe() (Azure STT)
+       |              --> _assess() (pronunciation + prosody)
+       |              --> FeedbackService (speech rate, pauses, vocab, coherence)
+       |              --> FeedbackService.generateFeedback()
+       |        --> AssessmentResult created
+       |        --> IeltsBandMapper.mapScoreToBand()
+       |
+       +--> Display: ScoreCard x8, WordHighlight, Feedback items, Band score
+       |
+       +--> RecordingsProvider.createRecording()
+                --> StorageService.addRecording()
+                --> Available in ResultDetailScreen later
+
+================================================================================
