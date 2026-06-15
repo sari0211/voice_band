@@ -27,6 +27,8 @@ class AzureSpeechService {
     String audioFilePath, {
     String? questionText,
   }) async {
+    _validateConfiguration();
+
     final audioBytes = await File(audioFilePath).readAsBytes();
 
     // Step 1: Transcribe
@@ -65,7 +67,9 @@ class AzureSpeechService {
 
     if (response.statusCode != 200) {
       throw Exception(
-          'Transcription failed (${response.statusCode}): ${response.body}');
+        'Transcription failed (${response.statusCode}). '
+        '${_authHintFor(response.statusCode)}${response.body}',
+      );
     }
 
     if (response.body.isEmpty) {
@@ -117,7 +121,9 @@ class AzureSpeechService {
 
     if (response.statusCode != 200) {
       throw Exception(
-          'Assessment failed (${response.statusCode}): ${response.body}');
+        'Assessment failed (${response.statusCode}). '
+        '${_authHintFor(response.statusCode)}${response.body}',
+      );
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -219,5 +225,28 @@ class AzureSpeechService {
     }
     // Fallback: estimate ~2 words per second
     return (words.length / 2).ceil();
+  }
+
+  void _validateConfiguration() {
+    if (_subscriptionKey.trim().isEmpty) {
+      throw Exception(
+        'Azure Speech key is missing. Run the app with '
+        '--dart-define=AZURE_SPEECH_KEY=your_key.',
+      );
+    }
+
+    if (_region.trim().isEmpty) {
+      throw Exception(
+        'Azure Speech region is missing. Run the app with '
+        '--dart-define=AZURE_SPEECH_REGION=your_region.',
+      );
+    }
+  }
+
+  String _authHintFor(int statusCode) {
+    if (statusCode != 401 && statusCode != 403) return '';
+
+    return 'Check that AZURE_SPEECH_KEY is current and belongs to the '
+        '$_region Speech resource. ';
   }
 }

@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Voice Band",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=AZURE_SPEECH_KEY=${env:AZURE_SPEECH_KEY}",
+        "--dart-define=AZURE_SPEECH_REGION=${env:AZURE_SPEECH_REGION}",
+        "--dart-define=GEMINI_API_KEY=${env:GEMINI_API_KEY}"
+      ]
+    }
+  ]
+}
